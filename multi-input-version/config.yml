@@ -1,0 +1,49 @@
+task: classify
+backend: pytorch
+dataset: conll-subsequence-jsonl
+modules:
+- multi_input.py
+- multi_input_pyt.py
+
+features:
+- name: global
+  vectorizer:
+    field: utterance
+    transform: baseline.lowercase
+    type: json-token1d
+  embeddings:
+    label: w2v-gn
+    finetune: true
+- name: local
+  vectorizer:
+    field: span
+    transform: baseline.lowercase
+    type: json-token1d
+  embeddings:
+    label: w2v-gn
+    finetune: true
+
+model:
+  type: global-local-conv
+  cmotsz: 100
+  dropout: 0.5
+  filtsz: [3, 4, 5]
+  share_global_local: false
+
+reader:
+  type: jsonl
+  label_vectorizer:
+    type: json-label
+    field: label
+
+train:
+  epochs: 50
+  optim: adam
+  eta: 0.0003
+  fit_func: default
+  early_stopping_metric: r_k
+  batchsz: 50
+ 
+unif: 0.25
+version: 2
+basedir: ./conll-model

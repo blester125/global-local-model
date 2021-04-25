@@ -1,0 +1,54 @@
+task: classify
+backend: tensorflow
+dataset: conll-subsequence
+modules:
+- global_local_classifier.py
+- global_local_classifier_tf.py
+
+features:
+- name: word
+  vectorizer:
+    fields: text
+    transform: baseline.lowercase
+    type: dict1d
+  embeddings:
+    label: w2v-gn
+    finetune: true
+- name: mask
+  vectorizer:
+    fields: mask
+    type: mask
+  # These embeddings won't be used, so make small random ones to appease mead's feature processing.
+  embeddings:
+    dsz: 1
+
+model:
+  type: global-local-conv
+  cmotsz: 100
+  dropout: 0.5
+  filtsz: [3, 4, 5]
+  share_global_local: false
+
+reader:
+  type: conll
+  label_vectorizer:
+    type: classify-label
+    fields:
+    - mask
+    - y
+  named_fields:
+    '0': text
+    '1': mask
+    '-1': y
+
+train:
+  epochs: 50
+  optim: adam
+  eta: 0.0003
+  fit_func: default
+  early_stopping_metric: r_k
+  batchsz: 50
+
+unif: 0.25
+version: 2
+basedir: ./conll-model

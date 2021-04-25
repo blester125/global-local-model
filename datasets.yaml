@@ -1,0 +1,4 @@
+- label: conll-subsequence
+  train_file: ./data/train.conll
+  valid_file: ./data/dev.conll
+  test_file: ./data/test.conll

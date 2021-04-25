@@ -1,0 +1,10 @@
+#+title: Global-Local Model with Multiple Inputs
+#+date: <2021-04-25 Sun>
+#+author: Brian Lester
+
+This is a version of the Global-Local Model that uses multiple input features instead of selecting the local representation from a shared embedding. This is needed to get a pytorch models that is exportable via ONNX.
+
+* Usage
+Right now the features are dispatched to one of the pooling models (=global= or =local=) based on the prefix of the feature name.
+
+The =mask-conll-to-json.py= is used to convert the masked conll files used by the original implementation into a json (or jsonl) format.

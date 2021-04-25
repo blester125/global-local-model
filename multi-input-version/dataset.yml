@@ -1,0 +1,4 @@
+- label: conll-subsequence-jsonl
+  train_file: ./data/train.jsonl
+  valid_file: ./data/dev.jsonl
+  test_file: ./data/test.jsonl

@@ -1,0 +1,116 @@
+#+title: Global Local Model for Subsequence Labeling
+#+date: <2021-04-25 Sun>
+#+author: Brian Lester
+
+This is a model that is designed to label a seubsection of a sequence, while still having access to the full context of the sequence. This repo contains the code for the Global-Local model from our paper [[https://arxiv.org/abs/2104.08701][Intent Features for Rich Natural Language Understanding]].
+
+This code has been tested most recently with =Mead-Baseline= v2.2.
+
+* The Model
+This model takes 2 inputs. The first is a sequence of tokens that make up an utterance. This is a standard DNN input for text classification. The second input is a mask of ones and zeros that has the same shape as the input tokens. This mask is used to denote which tokens are part of the subsequence to be classified (the ones) and those that are background information (the zeros). Note that this formulation allows for the span to be dis-contiguous.
+
+The model begins as a normal model where the input tokens are embedded from =[B, T]= $\rightarrow$ =[B, T, H]=. You could, optionally, run a contextualization step here. Something like a BiLSTM or self-attention will rewrite the token representations based on the surrounding tokens. You could also use a contextual embedding like BERT to create the original token representations.
+
+Next, a standard classification pooling technique like a ConvNet + max-over-time (MoT) pooling is used to reduce along the sequence dimension (=[B, T, H]= $\rightarrow$ =[B, H]=) to create a global representation of the sentence that takes the whole input utterance into account. This is the model starts to get a little different, the span mask is used to select the tokens that make up the subsequence from the embedded representation (=[B, T, H]= $\rightarrow$ =[B, T2, H]=) to create a local subsequence representation. Then another pooling function, optionally with shared parameters, is applied to the local representation, yielding a local representation of shape =[B, H]=. The global and local representations are then concatenated to for a vector of shape =[B, H + H]=. A normal output layer, or stack of layers, is then used to create logits over the possible number of classes.
+
+** Input Only Version
+A different implementation of the global-local model can be found in the =multi-input-version= directory. Instead of having the input as a single utterance and a mask the input is two different series of tokens. The first is the whole utterance, the second is the local model.
+
+The reason for this model is that the =gathers= were too fancy for ONNX exports; even though the local subsequence selection could be expressed in TorchScript.
+
+While weight sharing an embedding layer results in the same result as the original model, if you uses a secondary contextualization step in the original formulation that would not be expressible with this version. Also baseline isn't setup to do weight sharing here.
+
+This version of the model represents the =- shared embeddings= row in the ablation table of the paper (Table 4).
+* Data Format
+The data format is a conll file where one column is the surface terms, one column is the mask, and another column is the label. The label column doesn't have any IOBES markers, instead it is just a label and it needs to be the same for each token that has a $1$ in the mask.
+
+If a single utterance has multiple subsequences that are to be labeled then there will be multiple copies of the utterance. Each copy will have a different subsequence highlighted by the mask.
+
+Here is some example data:
+
+#+begin_example
+-- 0 O
+Dimitris 1 PER
+Kontogiannis 1 PER
+, 0 O
+Athens 0 O
+Newsroom 0 O
++301 0 O
+3311812-4 0 O
+
+-- 0 O
+Dimitris 0 O
+Kontogiannis 0 O
+, 0 O
+Athens 1 ORG
+Newsroom 1 ORG
++301 0 O
+3311812-4 0 O
+#+end_example
+** Creating Training Data
+The =conll-to-span-label.py= script is used to create training data. You need to provide the following CLI arguments:
+- =--surface-index= :: The column of the conll file that contains the surface terms.
+- =--span-index= :: The column of the conll file that has spans that are used to create the mask. For files like the CONLL2003 NER task we use the NER labels for this.
+- =--label-index= :: The column of the conll file that has the labels for our spans. These should be aligned with the spans in the =--span-index= column, but if there are mismatches in the boundaries then the most common label within the span (as defined by the =--span-index=) is used..
+* Usage
+** Training
+The mead-baseline infrastructure needed to run/train the model (vectorizers, readers, services, etc.) are found in the =global_local_classifier.py= file, while the actual model code is found in =global_local_classifier_tf.py=.
+
+An example config can be found at [[file:config.yml][config.yml]]. The most important parts of the config are:
+
+- Loading the required addons ::
+
+#+begin_src yaml
+modules:
+- global_local_classifier.py
+- global_local_classifier_tf.py
+#+end_src
+
+- The mask feature :: We need a feature for the mask input. Mead-baseline has inputs and embeddings tied together (the embedding sub-graphs are the only way that inputs like placeholders are defined/hydrated) so we need to have a fake embedding object attached to the mask input. This feature should use the =mask= vectorizer.
+
+#+begin_src yaml
+feature:
+- name: mask
+  vectorizer:
+    type: mask
+    fields: mask
+  embeddings:
+    dsz: 1
+#+end_src
+
+- The Model Type :: The model type should be =global-local-*=. The only current implementation uses ConvNets for the pooling and is called =global-local-conv=. You can share the weights of the pooling function using the src_yaml{share_global_local: bool} parameter.
+- The Custom Reader :: We should have named fields for out =text=, =mask=, and =y= values and we need to use the custom label vectorizers to be able to process the =y= column. AFAIK this is one of the few dict vectorizers in baseline that actually use multiple features (columns) from a conll file.
+
+#+begin_src yaml
+reader:
+  type: conll
+  label_vectorizer:
+    type: classify-label
+    fields:
+    - mask
+    - y
+  named_fields:
+    "0": text
+    "1": mask
+    "-1": y
+#+end_src
+
+/Note/ A lot of datasets end up rather skewed in the class distributions so setting early stopping to use the =r_k= metric can be helpful.
+** Exporting
+When exporting the model, both the =global_local_classifier= and the =global_local_classifier_tf= modules need to be loaded (via the =--modules= cli argument) and the exporter type should be set to =--exporter_type span-labeler=
+
+/Note/ While I have developed a pytorch version of the local span, as seen in the =notebooks= directory, this is not exportable via ONNX (despite the fact it can be expressed in TorchScript) so I have not created PyTorch version of the model or export.
+** Evaluating
+Many of the baseline models for this sort of task are span labeling taggers so a natural metric is the F1 values output create by the =conlleval= script. This means we need a conll file as the output of these models. We can use the =classify-spans-to-conll.py= script to create this file.
+* Citation
+If you use this model architecture, subsequence labeling task, or intent features please cite:
+
+#+begin_src BibTeX
+@article{lester-etal-2021-intent,
+  title={Intent Features for Rich Natural Language Understanding},
+  author={Lester, Brian and Choudhury, Sagnik Ray and Prasad, Rashmi and Bangalore, Srinivas},
+  journal={arXiv preprint arXiv:2104.08701},
+  url={https://arxiv.org/abs/2104.08701},
+  year={2021},
+}
+#+end_src
