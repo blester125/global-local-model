@@ -106,11 +106,16 @@ Many of the baseline models for this sort of task are span labeling taggers so a
 If you use this model architecture, subsequence labeling task, or intent features please cite:
 
 #+begin_src BibTeX
-@article{lester-etal-2021-intent,
-  title={Intent Features for Rich Natural Language Understanding},
-  author={Lester, Brian and Choudhury, Sagnik Ray and Prasad, Rashmi and Bangalore, Srinivas},
-  journal={arXiv preprint arXiv:2104.08701},
-  url={https://arxiv.org/abs/2104.08701},
-  year={2021},
+@inproceedings{lester-etal-2021-intent,
+    title = "Intent Features for Rich Natural Language Understanding",
+    author = "Lester, Brian  and Ray Choudhury, Sagnik  and Prasad, Rashmi  and Bangalore, Srinivas",
+    booktitle = "Proceedings of the 2021 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies: Industry Papers",
+    month = jun,
+    year = "2021",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/2021.naacl-industry.27",
+    pages = "214--221",
+    abstract = "Complex natural language understanding modules in dialog systems have a richer understanding of user utterances, and thus are critical in providing a better user experience. However, these models are often created from scratch, for specific clients and use cases and require the annotation of large datasets. This encourages the sharing of annotated data across multiple clients. To facilitate this we introduce the idea of \textit{intent features}: domain and topic agnostic properties of intents that can be learnt from the syntactic cues only, and hence can be shared. We introduce a new neural network architecture, the Global-Local model, that shows significant improvement over strong baselines for identifying these features in a deployed, multi-intent natural language understanding module, and more generally in a classification setting where a part of an utterance has to be classified utilizing the whole context.",
 }
 #+end_src
